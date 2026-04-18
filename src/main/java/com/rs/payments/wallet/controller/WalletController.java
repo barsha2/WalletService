@@ -11,7 +11,15 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -58,28 +66,44 @@ public class WalletController {
                 @ApiResponse(responseCode = "400", description = "Invalid amount")
         }
         )
-        @PostMapping("/deposit")
-        public ResponseEntity<Void> deposit(@Valid @RequestBody DepositRequest request) {
+        @PostMapping("/{userId}/deposit")
+        public ResponseEntity<Wallet> deposit(
+                @PathVariable UUID userId,
+                @RequestBody BigDecimal amount) {
 
-        walletService.deposit(request.getUserId(), request.getAmount());
-
-        return ResponseEntity.ok().build();
+        Wallet wallet = walletService.deposit(userId, amount);
+        return ResponseEntity.ok(wallet);
         }
 
-        @PostMapping("/withdraw")
-        public ResponseEntity<Void> withdraw(@Valid @RequestBody DepositRequest request) {
-        walletService.withdraw(request.getUserId(), request.getAmount());
-        return ResponseEntity.ok().build();
-        }
+        @PostMapping("/{userId}/withdraw")
+        public ResponseEntity<Wallet> withdraw(
+                @PathVariable UUID userId,
+                @RequestBody BigDecimal amount) {
 
-        @PostMapping("/transfer")
-        public ResponseEntity<Void> transfer(@RequestBody TransferRequest request) {
-        walletService.transfer(
+        Wallet wallet = walletService.withdraw(userId, amount);
+        return ResponseEntity.ok(wallet);
+        }
+        @PostMapping("/transfers")
+        public ResponseEntity<Map<String, Wallet>> transfer(@RequestBody TransferRequest request) {
+
+        Map<String, Wallet> result = walletService.transfer(
                 request.getFromUserId(),
                 request.getToUserId(),
                 request.getAmount()
         );
-        return ResponseEntity.ok().build();
+
+        return ResponseEntity.ok(result);
         }
-    
+
+        @GetMapping("/getWallet")
+        public List<Wallet> getAllWallets() {
+        return walletService.getAllWallets();
+        }
+
+        @GetMapping("/{userId}/balance")
+        public ResponseEntity<BigDecimal> getBalance(@PathVariable UUID userId) {
+
+        Wallet wallet = walletService.getWalletByUserId(userId);
+        return ResponseEntity.ok(wallet.getBalance());
+        }
 }

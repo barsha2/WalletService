@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -75,7 +76,6 @@ class WalletServiceImplTest {
 
     @Test
     void shouldDepositMoneySuccessfully() {
-        // given
         UUID userId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("100.00");
 
@@ -86,20 +86,18 @@ class WalletServiceImplTest {
         wallet.setUser(user);
         wallet.setBalance(BigDecimal.ZERO);
 
-        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(walletRepository.findByUser(user)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.saveAndFlush(wallet)).thenReturn(wallet); // 🔥 ADD THIS
 
-        // when
-        walletService.deposit(userId, amount);
+        Wallet result = walletService.deposit(userId, amount);
 
-        // then
-        assertEquals(new BigDecimal("100.00"), wallet.getBalance());
-        verify(walletRepository).save(wallet);
+        assertNotNull(result);
+        assertEquals(new BigDecimal("100.00"), result.getBalance());
+        verify(walletRepository).saveAndFlush(wallet);
     }
 
     @Test
     void shouldWithdrawMoneySuccessfully() {
-        // given
         UUID userId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("50.00");
 
@@ -110,15 +108,14 @@ class WalletServiceImplTest {
         wallet.setUser(user);
         wallet.setBalance(new BigDecimal("100.00"));
 
-        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(walletRepository.findByUser(user)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
+        when(walletRepository.saveAndFlush(wallet)).thenReturn(wallet); // 🔥 ADD THIS
 
-        // when
-        walletService.withdraw(userId, amount);
+        Wallet result = walletService.withdraw(userId, amount);
 
-        // then
-        assertEquals(new BigDecimal("50.00"), wallet.getBalance());
-        verify(walletRepository).save(wallet);
+        assertNotNull(result);
+        assertEquals(new BigDecimal("50.00"), result.getBalance());
+        verify(walletRepository).saveAndFlush(wallet);
     }
 
 
@@ -134,8 +131,7 @@ class WalletServiceImplTest {
         wallet.setUser(user);
         wallet.setBalance(new BigDecimal("100.00"));
 
-        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(walletRepository.findByUser(user)).thenReturn(Optional.of(wallet));
+        when(walletRepository.findByUserId(userId)).thenReturn(Optional.of(wallet));
 
         assertThrows(RuntimeException.class, () -> {
             walletService.withdraw(userId, amount);
@@ -164,33 +160,44 @@ class WalletServiceImplTest {
 
         when(userRepository.findById(fromUserId)).thenReturn(Optional.of(fromUser));
         when(userRepository.findById(toUserId)).thenReturn(Optional.of(toUser));
-        when(walletRepository.findByUser(fromUser)).thenReturn(Optional.of(fromWallet));
-        when(walletRepository.findByUser(toUser)).thenReturn(Optional.of(toWallet));
+        when(walletRepository.findByUserId(fromUserId)).thenReturn(Optional.of(fromWallet));
+        when(walletRepository.findByUserId(toUserId)).thenReturn(Optional.of(toWallet));
 
-        walletService.transfer(fromUserId, toUserId, amount);
+        // when
+        Map<String, Wallet> result = walletService.transfer(fromUserId, toUserId, amount);
 
-        assertEquals(new BigDecimal("50.00"), fromWallet.getBalance());
-        assertEquals(new BigDecimal("70.00"), toWallet.getBalance());
+        // then
+        assertNotNull(result);
+        assertEquals(new BigDecimal("50.00"), result.get("fromWallet").getBalance());
+        assertEquals(new BigDecimal("70.00"), result.get("toWallet").getBalance());
+
+        // 🔥 ADD THIS
+        verify(walletRepository).saveAndFlush(fromWallet);
+        verify(walletRepository).saveAndFlush(toWallet);
     }
 
     @Test
-void shouldFailWhenInsufficientBalance() {
-    UUID fromUserId = UUID.randomUUID();
-    UUID toUserId = UUID.randomUUID();
-    BigDecimal amount = new BigDecimal("150.00");
+    void shouldFailWhenInsufficientBalance() {
+        UUID fromUserId = UUID.randomUUID();
+        UUID toUserId = UUID.randomUUID();
+        BigDecimal amount = new BigDecimal("150.00");
 
-    User fromUser = new User();
-    fromUser.setId(fromUserId);
+        User fromUser = new User();
+        fromUser.setId(fromUserId);
 
-    Wallet fromWallet = new Wallet();
-    fromWallet.setUser(fromUser);
-    fromWallet.setBalance(new BigDecimal("100.00"));
+        User toUser = new User();
+        toUser.setId(toUserId);
 
-    when(userRepository.findById(fromUserId)).thenReturn(Optional.of(fromUser));
-    when(walletRepository.findByUser(fromUser)).thenReturn(Optional.of(fromWallet));
+        Wallet fromWallet = new Wallet();
+        fromWallet.setUser(fromUser);
+        fromWallet.setBalance(new BigDecimal("100.00"));
 
-    assertThrows(RuntimeException.class, () -> {
-        walletService.transfer(fromUserId, toUserId, amount);
-    });
-}
+        when(userRepository.findById(fromUserId)).thenReturn(Optional.of(fromUser));
+        when(userRepository.findById(toUserId)).thenReturn(Optional.of(toUser)); // 🔥 ADD THIS
+        when(walletRepository.findByUserId(fromUserId)).thenReturn(Optional.of(fromWallet));
+
+        assertThrows(RuntimeException.class, () -> {
+            walletService.transfer(fromUserId, toUserId, amount);
+        });
+    }
 }
